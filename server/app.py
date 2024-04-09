@@ -17,13 +17,12 @@ db.init_app(app)
 api = Api(app)
 
 
-class Plants(Resource):
-
-    def get(self):
+@app.route('/plants', methods=['GET', 'POST'])
+def all_plants():
+    if request.method == 'GET':
         plants = [plant.to_dict() for plant in Plant.query.all()]
         return make_response(jsonify(plants), 200)
-
-    def post(self):
+    elif request.method == 'POST':
         data = request.get_json()
 
         new_plant = Plant(
@@ -38,17 +37,34 @@ class Plants(Resource):
         return make_response(new_plant.to_dict(), 201)
 
 
-api.add_resource(Plants, '/plants')
+@app.route('/plants/<int:id>', methods=['GET', 'PATCH', 'DELETE'])
+def plant_by_id(id):
+    plants = Plant.query.filter_by(id=id).first()
 
+    if plants is None:
+        return {'error': f'{id} not found'}, 404
 
-class PlantByID(Resource):
+    if request.method == 'GET':
+        plant_dict = plants.to_dict()
+        return make_response(jsonify(plant_dict), 200)
+    
+    elif request.method == 'PATCH':
+        json_data = request.get_json()
 
-    def get(self, id):
-        plant = Plant.query.filter_by(id=id).first().to_dict()
-        return make_response(jsonify(plant), 200)
+        for field in json_data:
+            value = json_data[field]
+            setattr(plants, field, value)
 
+        db.session.commit()
 
-api.add_resource(PlantByID, '/plants/<int:id>')
+        updated_plant_dict = plants.to_dict()
+        return make_response(jsonify(updated_plant_dict), 200)
+    
+    elif request.method == 'DELETE':
+        db.session.delete(plants)
+        db.session.commit()
+
+        return {}, 204
 
 
 if __name__ == '__main__':
